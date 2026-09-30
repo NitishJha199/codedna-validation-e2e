@@ -1,0 +1,47 @@
+name: CodeDNA Validation Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deployment-evidence:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - order-api
+          - inventory-api
+
+    steps:
+      - name: Create successful deployment evidence
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const service = "${{ matrix.service }}";
+
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: `${service}:validation`,
+              auto_merge: false,
+              required_contexts: [],
+              transient_environment: true,
+              production_environment: false
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: "success",
+              environment: `${service}:validation`,
+              auto_inactive: false
+            });

@@ -1,0 +1,50 @@
+name: CodeDNA Validation CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - order-api
+          - inventory-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate service
+        working-directory: services/${{ matrix.service }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -c "from app import app; print(app.title)"
+
+      - name: Generate CycloneDX SBOM
+        working-directory: services/${{ matrix.service }}
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py requirements requirements.txt \
+            --output-format JSON \
+            --output-file sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: codedna-sbom-${{ matrix.service }}
+          path: services/${{ matrix.service }}/sbom.json
+          retention-days: 7
